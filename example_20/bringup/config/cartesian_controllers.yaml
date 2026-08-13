@@ -37,3 +37,4 @@ cartesian_motion:
     # The controller fills joint velocities and streams continuous chunks, so each trajectory ends
     # mid-motion (non-zero final velocity). Without this, JTC's validate_trajectory_msg rejects it.
     allow_nonzero_velocity_at_trajectory_end: true
+    interpolate_from_desired_state: true
