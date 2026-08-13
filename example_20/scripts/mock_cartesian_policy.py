@@ -45,11 +45,11 @@ class MockCartesianPolicy(Node):
         self.declare_parameter("tip", "tool0")
         self.declare_parameter("pattern", "circle")  # circle | square | line
         # Action-chunking policy characteristics (receding horizon -> overlapping chunks):
-        self.declare_parameter("policy_hz", 5.0)   # inference / replan rate
+        self.declare_parameter("policy_hz", 5.0)  # inference / replan rate
         self.declare_parameter("action_hz", 30.0)  # in-chunk action rate
-        self.declare_parameter("horizon", 1.0)     # s of future poses per chunk (>> 1/policy_hz)
-        self.declare_parameter("period", 24.0)     # s to trace one full pattern (bounds TCP speed)
-        self.declare_parameter("radius", 0.2)      # m, circle radius / pattern size
+        self.declare_parameter("horizon", 1.0)  # s of future poses per chunk (>> 1/policy_hz)
+        self.declare_parameter("period", 24.0)  # s to trace one full pattern (bounds TCP speed)
+        self.declare_parameter("radius", 0.2)  # m, circle radius / pattern size
 
         controller = self.get_parameter("controller").value
         self.base = self.get_parameter("base").value
@@ -62,7 +62,8 @@ class MockCartesianPolicy(Node):
         self.r = float(self.get_parameter("radius").value)
         if self.pattern not in ("circle", "square", "line"):
             self.get_logger().warn(
-                f"unknown pattern '{self.pattern}'; expected circle | square | line -> using 'line'.")
+                f"unknown pattern '{self.pattern}'; expected circle | square | line -> using 'line'."
+            )
             self.pattern = "line"
 
         self.pub = self.create_publisher(
@@ -88,7 +89,9 @@ class MockCartesianPolicy(Node):
 
     def _lookup_tcp(self):
         try:
-            return self.tf_buffer.lookup_transform(self.base, self.tip, rclpy.time.Time()).transform
+            return self.tf_buffer.lookup_transform(
+                self.base, self.tip, rclpy.time.Time()
+            ).transform
         except Exception:  # noqa: BLE001 - transform not ready yet
             return None
 

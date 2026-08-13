@@ -25,11 +25,6 @@ commanded Cartesian path. We observe the executed TCP exactly as a user would: v
   C  multi-pose chunk      -> TCP passes through each commanded waypoint (policy/streaming case)
   D  Cartesian smoothness  -> TCP velocity continuous (no steps), from finite differences
   E  joint-limit checks    -> count /joint_states samples past URDF limits (deferred-limits metric)
-
-A plain JointTrajectoryController given the same endpoints in JOINT space would bow the TCP off the
-straight line (see userdoc) - that contrast is documented, not re-run here.
-
-Prereq: cartesian_motion active with run_policy:=false (no competing publisher).
 """
 
 import math
@@ -119,8 +114,8 @@ class Verifier(Node):
         for k, (pos, quat) in enumerate(poses):
             pt = MultiDOFJointTrajectoryPoint()
             tf = Transform()
-            tf.translation.x, tf.translation.y, tf.translation.z = [float(v) for v in pos]
-            tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w = [float(v) for v in quat]
+            tf.translation.x, tf.translation.y, tf.translation.z = (float(v) for v in pos)
+            tf.rotation.x, tf.rotation.y, tf.rotation.z, tf.rotation.w = (float(v) for v in quat)
             pt.transforms.append(tf)
             pt.time_from_start = rclpy.duration.Duration(seconds=(k + 1) * dt).to_msg()
             traj.points.append(pt)
@@ -180,7 +175,8 @@ def cartesian_smoothness(samples):
 
 def tcp_now(node, timeout=2.0):
     """Current (pos, quat), spinning until base_link->tool0 is available so a transient TF miss does
-    not crash the caller's tuple-unpack; raises after ``timeout`` if the transform is truly gone."""
+    not crash the caller's tuple-unpack; raises after ``timeout`` if the transform is truly gone.
+    """
     end = time.time() + timeout
     while time.time() < end:
         s = node.tcp()
@@ -205,7 +201,7 @@ def main():
         results[name] = cond
         print(f"    [{'  OK  ' if cond else ' FAIL '}] {name}  {detail}")
 
-    # A: LIN straight line 
+    # A: LIN straight line
     print("\n==== A: LIN straight line ====")
     p0, q0 = tcp_now(node)
     goal = p0 + np.array([0.15, 0.0, 0.0])
@@ -216,7 +212,7 @@ def main():
     ok("A path-fidelity (TCP on the line)", dev < DEV_TOL, f"max dev {dev * 1000:.1f} mm")
     ok("A reached goal", float(np.linalg.norm(pf - goal)) < POS_TOL, f"err {fmt(pf - goal)}")
 
-    # B: orientation SLERP in place 
+    # B: orientation SLERP in place
     print("\n==== B: orientation SLERP (reorient in place) ====")
     p0, q0 = tcp_now(node)
     goal_q = quat_mul(q0, quat_axis_angle([0, 1, 0], 0.6))
@@ -228,10 +224,13 @@ def main():
     pf, qf = tcp_now(node)
     ok("B position held during reorient", drift < 0.02, f"max drift {drift * 1000:.1f} mm")
     ok("B orientation converges monotonically (SLERP)", monotonic)
-    ok("B reached goal orientation", quat_angle(qf, goal_q) < ORI_TOL,
-       f"err {quat_angle(qf, goal_q):.3f} rad")
+    ok(
+        "B reached goal orientation",
+        quat_angle(qf, goal_q) < ORI_TOL,
+        f"err {quat_angle(qf, goal_q):.3f} rad",
+    )
 
-    # C: multi-pose action chunk (arc) 
+    # C: multi-pose action chunk (arc)
     print("\n==== C: multi-pose chunk (Cartesian arc) ====")
     p0, q0 = tcp_now(node)
     wps = []
@@ -240,32 +239,34 @@ def main():
         wps.append((p0 + np.array([0.12 * math.sin(a), 0.0, 0.12 * (1 - math.cos(a))]), q0))
     node.publish_chunk(wps, dt=0.6)
     s = node.record(0.6 * len(wps) + 1.5)
-    hit = all(
-        any(float(np.linalg.norm(p - wp)) < 0.02 for _, p, _ in s) for wp, _ in wps
-    )
+    hit = all(any(float(np.linalg.norm(p - wp)) < 0.02 for _, p, _ in s) for wp, _ in wps)
     pf, _ = tcp_now(node)
     ok("C passes through all waypoints", hit)
     ok("C reached final waypoint", float(np.linalg.norm(pf - wps[-1][0])) < POS_TOL)
 
-    # D: Cartesian smoothness (reuse the arc recording) 
+    # D: Cartesian smoothness (reuse the arc recording)
     print("\n==== D: Cartesian smoothness ====")
     peak_v, peak_a, max_vjump = cartesian_smoothness(s)
 
     vjump_limit = 0.35 * peak_v + 0.02
-    ok("D TCP velocity continuous (no step)", max_vjump < vjump_limit,
-       f"peak|v|={peak_v:.3f} peak|a|={peak_a:.2f} maxVjump={max_vjump:.3f} (limit {vjump_limit:.3f})")
+    ok(
+        "D TCP velocity continuous (no step)",
+        max_vjump < vjump_limit,
+        f"peak|v|={peak_v:.3f} peak|a|={peak_a:.2f} maxVjump={max_vjump:.3f} (limit {vjump_limit:.3f})",
+    )
 
-    # E: joint-limit violations (Denis's metric) 
+    # E: joint-limit violations (Denis's metric)
     print("\n==== E: joint-limit violations ====")
-    ok("E no joint-limit violations", node.limit_violations == 0,
-       f"count {node.limit_violations}")
+    ok("E no joint-limit violations", node.limit_violations == 0, f"count {node.limit_violations}")
 
-    # summary 
+    # summary
     print("\n================ SUMMARY ================")
     overall = all(results.values())
     for name, r in results.items():
         print(f"  {'PASS' if r else 'FAIL'}  {name}")
-    print("\n  (A plain JointTrajectoryController given these endpoints in joint space would bow the")
+    print(
+        "\n  (A plain JointTrajectoryController given these endpoints in joint space would bow the"
+    )
     print("   TCP off the straight line - see userdoc. This controller keeps it on the line.)")
     print("\nOVERALL:", "PASS" if overall else "FAIL")
 

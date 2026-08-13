@@ -33,8 +33,5 @@ cartesian_motion:
     max_cartesian_speed: 0.1
     max_angular_speed: 0.5
     resample_dt: 0.01
-
-    # The controller fills joint velocities and streams continuous chunks, so each trajectory ends
-    # mid-motion (non-zero final velocity). Without this, JTC's validate_trajectory_msg rejects it.
     allow_nonzero_velocity_at_trajectory_end: true
     interpolate_from_desired_state: true
